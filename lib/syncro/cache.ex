@@ -1,6 +1,7 @@
 defmodule Syncro.Cache do
   use GenServer
   require Logger
+  alias Syncro.ETS
 
   @tab :syncro_cache
   @fail_timeout 10 * 1000
@@ -8,7 +9,7 @@ defmodule Syncro.Cache do
   def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
 
   def init(state) do
-    :ets.new(@tab, [:set, :protected, :named_table])
+    ETS.create(@tab, [:set, :protected, :named_table])
     {:ok, state}
   end
 
@@ -70,7 +71,7 @@ defmodule Syncro.Cache do
 
   defp cache(name, data) do
     IO.puts("---- updating cache")
-    :ets.insert(@tab, {name, data})
+    ETS.insert(@tab, name, data)
   end
 
   def info(), do: GenServer.call(__MODULE__, :info)

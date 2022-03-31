@@ -1,6 +1,7 @@
 defmodule Syncro.Provider do
   use GenServer
   require Logger
+  alias Syncro.ETS
 
   @registry :syncro_providers
 
@@ -45,11 +46,11 @@ defmodule Syncro.Provider do
           mfa
       end
 
-    :ets.insert(@registry, {name, sync_thru})
+    ETS.insert(@registry, name, sync_thru)
   end
 
   def sync(name) do
-    :ets.tab2list(@registry)
+    ETS.list(@registry)
     |> Enum.filter(&(elem(&1, 0) == name))
     |> Enum.each(&fetch_and_sync/1)
   end
@@ -62,7 +63,7 @@ defmodule Syncro.Provider do
 
   @spec sync_all() :: :ok
   def sync_all() do
-    :ets.tab2list(@registry)
+    ETS.list(@registry)
     |> Enum.each(&fetch_and_sync/1)
   end
 
