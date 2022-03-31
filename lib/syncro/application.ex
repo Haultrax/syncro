@@ -2,6 +2,8 @@ defmodule Syncro.Application do
   use Application
   require Logger
 
+  alias Syncro.{Nodes, Cache}
+
   @reconnect_period 10
 
   def start(_type, _args) do
@@ -49,10 +51,10 @@ defmodule Syncro.Application do
   end
 
   defp attach_listeners() do
-    # Application.get_env(:syncro, :listeners, %{})
-    # |> Enum.each(fn {name, node_designation} ->
-    #   node = Syncro.API.Direct.designation_to_node(node_designation)
-    #   Syncro.API.Replicate.listen_sync(name, node)
-    # end)
+    Application.get_env(:syncro, :listeners, %{})
+    |> Enum.each(fn {name, node_designation} ->
+      node = Nodes.designation_to_node(node_designation)
+      Cache.listen_sync(name, node)
+    end)
   end
 end
