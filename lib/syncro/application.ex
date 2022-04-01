@@ -2,52 +2,12 @@ defmodule Syncro.Application do
   use Application
   require Logger
 
-  @reconnect_period 10
+  alias Syncro.Provider
 
   def start(_type, _args) do
-    configure_nodes()
+    Provider.create()
 
     opts = [strategy: :one_for_one, name: Syncro.Supervisor]
-    ret = Supervisor.start_link(children(), opts)
-
-    ret
-  end
-
-  def children() do
-    [
-      {Phoenix.PubSub, name: Syncro.server(), adapter: Phoenix.PubSub.PG2},
-      Syncro.Cache,
-      Syncro.Provider,
-      Syncro.Monitor
-    ]
-  end
-
-  defp log(level, msg), do: Logger.log(level, "[Syncro] #{msg}")
-
-  defp configure_nodes() do
-    this_node = node()
-
-    log(:info, "Node => #{this_node}")
-
-    node_register = Application.get_env(:syncro, :nodes, %{})
-
-    configure_liaison(this_node, node_register)
-
-    Syncro.Nodes.configure(node_register)
-  end
-
-  defp configure_liaison(:nonode@nohost, _node_register), do: nil
-
-  defp configure_liaison(_node, node_register) do
-    log(:debug, "Configuring liaison")
-    nodes = Map.values(node_register)
-
-    strategy = [
-      strategy: Liaison.Strategy.Epmd,
-      nodes: nodes,
-      reconnect_period: @reconnect_period
-    ]
-
-    Liaison.Application.add_child(strategy)
+    Supervisor.start_link([], opts)
   end
 end

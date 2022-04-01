@@ -1,3 +1,3 @@
 import Config
 
-config :syncro, server: :syncro_pubsub, nodes: %{}, listeners: %{}
+config :syncro, provider: :syncro_provider, cache: :syncro_cache

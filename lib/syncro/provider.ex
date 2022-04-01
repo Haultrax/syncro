@@ -1,88 +1,50 @@
 defmodule Syncro.Provider do
-  use GenServer
-  require Logger
   alias Syncro.ETS
-
-  @registry :syncro_providers
+  require Logger
 
   defp log(level, msg), do: Logger.log(level, "[Syncro|Provider] #{msg}")
 
-  def start_link(_opts) do
-    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
-  end
+  @spec registry() :: atom
+  def registry(), do: Application.get_env(:syncro, :provider, :syncro_provider)
 
-  def init(state) do
-    ETS.create(@registry, [:set, :public, :named_table])
-    {:ok, state, {:continue, :listen}}
-  end
+  @spec create() :: :ok | :exists
+  def create(), do: ETS.create(registry(), [:set, :public, :named_table])
 
-  def handle_continue(:listen, state) do
-    Phoenix.PubSub.subscribe(Syncro.server(), "request-sync")
-    log(:debug, "Listening for requests")
-    {:noreply, state}
-  end
-
-  def handle_info({"request-sync", from_node, reason}, state) do
-    if from_node != node() do
-      log(:debug, "sync request received -- #{reason}")
-      sync_all()
-    end
-
-    {:noreply, state}
-  end
-
-  def register(input, opts) do
-    register(opts)
-    input
-  end
-
-  def register(opts) do
-    name = Keyword.fetch!(opts, :name)
-
-    sync_thru =
-      case Keyword.fetch!(opts, :sync_thru) do
-        fun when is_atom(fun) ->
-          module =
-            self()
-            |> Process.info()
-            |> Keyword.fetch!(:registered_name)
-
-          {module, fun, []}
-
-        {_module, _fun, _args} = mfa ->
-          mfa
-      end
-
-    ETS.insert(@registry, name, sync_thru)
-    sync(name)
+  @spec register(atom, fun) :: :ok
+  def register(name, sync_from) when is_atom(name) and is_function(sync_from, 0) do
+    log(:info, "registered => '#{name}'")
+    ETS.insert(registry(), name, sync_from)
   end
 
   def sync(name) do
-    log(:debug, "Syncing '#{name}'")
+    case ETS.get(registry(), name) do
+      nil ->
+        log(:debug, "cannot sync '#{name}' as it is not registered")
 
-    ETS.list(@registry)
-    |> Enum.filter(&(elem(&1, 0) == name))
-    |> Enum.each(&fetch_and_sync/1)
+      callback ->
+        log(:debug, "syncing '#{name}'")
+        sync(name, callback.())
+    end
   end
 
   @spec sync(String.t(), any()) :: :ok | {:error, term}
   def sync(name, data) do
-    topic = "sync:#{name}"
-    Phoenix.PubSub.broadcast(Syncro.server(), topic, {name, data})
+    Enum.each(Node.list(), fn nodename ->
+      case :rpc.call(nodename, Syncro.Cache, :update, [name, data]) |> IO.inspect() do
+        {:badrpc, :nodedown} -> {:error, :nodedown}
+        {:badrpc, reason} -> {:error, reason}
+        resp -> resp
+      end
+    end)
   end
 
   @spec sync_all() :: :ok
   def sync_all() do
     log(:debug, "Syncing all")
 
-    ETS.list(@registry)
-    |> Enum.each(&fetch_and_sync/1)
+    ETS.list(registry())
+    |> Enum.map(&sync/1)
   end
 
-  defp fetch_and_sync({name, {module, fun, args}}) do
-    data = apply(module, fun, args)
-    sync(name, data)
-  end
-
-  def is_providing?(), do: length(ETS.list(@registry)) > 0
+  def is_providing?(), do: length(ETS.list(registry())) > 0
 end
