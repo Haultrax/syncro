@@ -4,6 +4,8 @@ defmodule Syncro.Monitor do
 
   alias Syncro.Provider
 
+  defp log(level, msg), do: Logger.log(level, "[Syncro|Monitor] #{msg}")
+
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
@@ -18,12 +20,12 @@ defmodule Syncro.Monitor do
   end
 
   def handle_info({:nodedown, nodename}, state) do
-    Logger.info("[Disconnected] #{nodename}")
+    log(:info, "Disconnected from '#{nodename}'")
     {:noreply, state}
   end
 
   def handle_info({:nodeup, nodename}, state) do
-    Logger.info("[Connected] #{nodename} -- syncing")
+    log(:info, "Connected to #{nodename}")
     Provider.sync_all()
     {:noreply, state}
   end

@@ -6,6 +6,8 @@ defmodule Syncro.Cache do
   @tab :syncro_cache
   @fail_timeout 10 * 1000
 
+  defp log(level, msg), do: Logger.log(level, "[Syncro|Cache] #{msg}")
+
   def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
 
   def init(state) do
@@ -36,11 +38,12 @@ defmodule Syncro.Cache do
       false ->
         case Phoenix.PubSub.subscribe(Syncro.server(), topic) do
           :ok ->
+            log(:info, "Subscribed to '#{topic}'")
             {:ok, Map.put(state, topic, node)}
 
           error ->
-            Logger.warn("[Replicate] Unable to subscribe to '#{topic}'")
-            Logger.error(inspect(error))
+            log(:warn, "Unable to subscribe to '#{topic}'")
+            log(:error, inspect(error))
             :timer.sleep(@fail_timeout)
             subscribe(topic, node, state)
         end
@@ -55,11 +58,12 @@ defmodule Syncro.Cache do
       false ->
         case Phoenix.PubSub.unsubscribe(Syncro.server(), topic) do
           :ok ->
+            log(:info, "Unsubscribed from '#{topic}'")
             {:ok, Map.drop(state, [topic])}
 
           error ->
-            Logger.warn("[Replicate] Unable to unsubscribe from '#{topic}'")
-            Logger.error(inspect(error))
+            log(:warn, "Unable to unsubscribe from '#{topic}'")
+            log(:error, inspect(error))
             :timer.sleep(@fail_timeout)
             unsubscribe(topic, state)
         end
@@ -70,7 +74,7 @@ defmodule Syncro.Cache do
   end
 
   defp cache(name, data) do
-    IO.puts("---- updating cache")
+    log(:debug, "Updating '#{name}'")
     ETS.insert(@tab, name, data)
   end
 

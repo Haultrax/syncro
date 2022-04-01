@@ -27,4 +27,15 @@ defmodule Syncro.ETS do
 
   @spec list(atom | pid) :: list()
   def list(tab), do: :ets.tab2list(tab)
+
+  @spec info(atom | pid) :: Keyword.t() | nil
+  def info(tab) do
+    case :ets.info(tab) do
+      :undefined -> nil
+      info -> info
+    end
+  end
+
+  @spec exists?(atom | pid) :: boolean()
+  def exists?(tab), do: :ets.info(tab) != :undefined
 end

@@ -23,10 +23,12 @@ defmodule Syncro.Application do
     ret
   end
 
+  defp log(level, msg), do: Logger.log(level, "[Syncro] #{msg}")
+
   defp configure_nodes() do
     this_node = node()
 
-    Logger.info("Node: #{inspect(this_node)}")
+    log(:info, "Node => #{this_node}")
 
     node_register = Application.get_env(:syncro, :nodes, %{})
 
@@ -38,7 +40,7 @@ defmodule Syncro.Application do
   defp configure_liaison(:nonode@nohost, _node_register), do: nil
 
   defp configure_liaison(_node, node_register) do
-    Logger.info("configuring liaison")
+    log(:debug, "Configuring liaison")
     nodes = Map.values(node_register)
 
     strategy = [

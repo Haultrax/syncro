@@ -5,12 +5,14 @@ defmodule Syncro.Provider do
 
   @registry :syncro_providers
 
+  defp log(level, msg), do: Logger.log(level, "[Syncro|Provider] #{msg}")
+
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
   def init(state) do
-    ETS.create(@registry, [:set, :protected, :named_table])
+    ETS.create(@registry, [:set, :public, :named_table])
     {:ok, state, {:continue, :listen}}
   end
 
@@ -20,14 +22,8 @@ defmodule Syncro.Provider do
   end
 
   def handle_info("request", state) do
-    Logger.info("[Provider] sync request")
+    log(:info, "sync request received")
     sync_all()
-    {:noreply, state}
-  end
-
-  def handle_call({:register, name, sync_thru}, _from, state) do
-    ETS.insert(@registry, name, sync_thru)
-
     {:noreply, state}
   end
 
@@ -53,10 +49,12 @@ defmodule Syncro.Provider do
           mfa
       end
 
-    GenServer.call(__MODULE__, {:register, name, sync_thru})
+    ETS.insert(@registry, name, sync_thru)
   end
 
   def sync(name) do
+    log(:debug, "Syncing '#{name}'")
+
     ETS.list(@registry)
     |> Enum.filter(&(elem(&1, 0) == name))
     |> Enum.each(&fetch_and_sync/1)
@@ -70,6 +68,8 @@ defmodule Syncro.Provider do
 
   @spec sync_all() :: :ok
   def sync_all() do
+    log(:debug, "Syncing all")
+
     ETS.list(@registry)
     |> Enum.each(&fetch_and_sync/1)
   end
