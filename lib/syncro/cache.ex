@@ -22,15 +22,25 @@ defmodule Syncro.Cache do
 
   def handle_call(:info, _from, state), do: {:reply, state, state}
 
+  def handle_call(:force_sync, _from, state) do
+    resp = request_sync("forced")
+    {:reply, resp, state}
+  end
+
   def handle_call({:subscribe, topic, node}, _from, state) do
     {:ok, state} = subscribe(topic, node, state)
-    Phoenix.PubSub.broadcast(Syncro.server(), "request", "request")
-    {:reply, :ok, state}
+    resp = request_sync(topic)
+    {:reply, resp, state}
   end
 
   def handle_call({:unsubscribe, topic}, _from, state) do
     {:ok, state} = unsubscribe(topic, state)
     {:reply, :ok, state}
+  end
+
+  defp request_sync(reason) do
+    log(:debug, "sending request")
+    Phoenix.PubSub.broadcast(Syncro.server(), "request-sync", {"request-sync", node(), reason})
   end
 
   defp subscribe(topic, node, state) do
@@ -92,4 +102,7 @@ defmodule Syncro.Cache do
       _ -> default
     end
   end
+
+  @spec force_sync() :: :ok | {:error, term}
+  def force_sync(), do: GenServer.call(__MODULE__, :force_sync)
 end

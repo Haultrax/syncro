@@ -2,7 +2,7 @@ defmodule Syncro.Application do
   use Application
   require Logger
 
-  alias Syncro.{Nodes, Cache}
+  alias Syncro.{Nodes, Cache, Provider}
 
   @reconnect_period 10
 
@@ -18,8 +18,6 @@ defmodule Syncro.Application do
 
     opts = [strategy: :one_for_one, name: Syncro.Supervisor]
     ret = Supervisor.start_link(children, opts)
-
-    attach_listeners()
 
     ret
   end
@@ -51,13 +49,5 @@ defmodule Syncro.Application do
     ]
 
     Liaison.Application.add_child(strategy)
-  end
-
-  defp attach_listeners() do
-    Application.get_env(:syncro, :listeners, %{})
-    |> Enum.each(fn {name, node_designation} ->
-      node = Nodes.designation_to_node(node_designation)
-      Cache.listen_sync(name, node)
-    end)
   end
 end

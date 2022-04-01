@@ -2,7 +2,7 @@ defmodule Syncro.Monitor do
   require Logger
   use GenServer
 
-  alias Syncro.Provider
+  alias Syncro.{Nodes, Provider, Cache}
 
   defp log(level, msg), do: Logger.log(level, "[Syncro|Monitor] #{msg}")
 
@@ -14,7 +14,9 @@ defmodule Syncro.Monitor do
     Process.flag(:trap_exit, true)
     :net_kernel.monitor_nodes(true)
 
+    attach_listeners()
     Provider.sync_all()
+    Cache.force_sync()
 
     {:ok, %{}}
   end
@@ -30,5 +32,13 @@ defmodule Syncro.Monitor do
     end
 
     {:noreply, state}
+  end
+
+  def attach_listeners() do
+    Application.get_env(:syncro, :listeners, %{})
+    |> Enum.each(fn {name, node_designation} ->
+      node = Nodes.designation_to_node(node_designation)
+      Cache.listen_sync(name, node)
+    end)
   end
 end

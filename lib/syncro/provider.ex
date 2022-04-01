@@ -17,13 +17,17 @@ defmodule Syncro.Provider do
   end
 
   def handle_continue(:listen, state) do
-    Phoenix.PubSub.subscribe(Syncro.server(), "request")
+    Phoenix.PubSub.subscribe(Syncro.server(), "request-sync")
+    log(:debug, "Listening for requests")
     {:noreply, state}
   end
 
-  def handle_info("request", state) do
-    log(:info, "sync request received")
-    sync_all()
+  def handle_info({"request-sync", from_node, reason}, state) do
+    if from_node != node() do
+      log(:debug, "sync request received -- #{reason}")
+      sync_all()
+    end
+
     {:noreply, state}
   end
 
