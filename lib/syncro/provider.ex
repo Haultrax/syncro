@@ -10,6 +10,7 @@ defmodule Syncro.Provider do
   end
 
   def init(state) do
+    ETS.create(@registry, [:set, :protected, :named_table])
     {:ok, state, {:continue, :listen}}
   end
 
@@ -21,6 +22,12 @@ defmodule Syncro.Provider do
   def handle_info("request", state) do
     Logger.info("[Provider] sync request")
     sync_all()
+    {:noreply, state}
+  end
+
+  def handle_call({:register, name, sync_thru}, _from, state) do
+    ETS.insert(@registry, name, sync_thru)
+
     {:noreply, state}
   end
 
@@ -46,7 +53,7 @@ defmodule Syncro.Provider do
           mfa
       end
 
-    ETS.insert(@registry, name, sync_thru)
+    GenServer.call(__MODULE__, {:register, name, sync_thru})
   end
 
   def sync(name) do
