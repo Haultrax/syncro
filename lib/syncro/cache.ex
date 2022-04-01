@@ -8,7 +8,10 @@ defmodule Syncro.Cache do
 
   defp log(level, msg), do: Logger.log(level, "[Syncro|Cache] #{msg}")
 
-  def start_link(_opts), do: GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  def start_link(_opts) do
+    state = %{topics: %{}, notifier: nil}
+    GenServer.start_link(__MODULE__, state, name: __MODULE__)
+  end
 
   def init(state) do
     ETS.create(@tab, [:set, :protected, :named_table])
@@ -17,10 +20,21 @@ defmodule Syncro.Cache do
 
   def handle_info({name, data}, state) do
     cache(name, data)
+
+    case state.notifier do
+      nil -> nil
+      fun -> fun.(name, data)
+    end
+
     {:noreply, state}
   end
 
   def handle_call(:info, _from, state), do: {:reply, state, state}
+
+  def handle_call({:add_notifier, func}, _from, state) do
+    state = Map.put(state, :notifier, func)
+    {:reply, :ok, state}
+  end
 
   def handle_call(:force_sync, _from, state) do
     resp = request_sync("forced")
@@ -39,17 +53,18 @@ defmodule Syncro.Cache do
   end
 
   defp request_sync(reason) do
-    log(:debug, "sending request")
+    log(:debug, "sending sync request")
     Phoenix.PubSub.broadcast(Syncro.server(), "request-sync", {"request-sync", node(), reason})
   end
 
   defp subscribe(topic, node, state) do
-    case Map.has_key?(state, topic) do
+    case Map.has_key?(state.topics, topic) do
       false ->
         case Phoenix.PubSub.subscribe(Syncro.server(), topic) do
           :ok ->
             log(:info, "Subscribed to '#{topic}'")
-            {:ok, Map.put(state, topic, node)}
+            topics = Map.put(state.topics, topic, node)
+            {:ok, Map.put(state, :topics, topics)}
 
           error ->
             log(:warn, "Unable to subscribe to '#{topic}'")
@@ -69,7 +84,8 @@ defmodule Syncro.Cache do
         case Phoenix.PubSub.unsubscribe(Syncro.server(), topic) do
           :ok ->
             log(:info, "Unsubscribed from '#{topic}'")
-            {:ok, Map.drop(state, [topic])}
+            topics = Map.drop(state.topics, [topic])
+            {:ok, Map.put(state, :topics, topics)}
 
           error ->
             log(:warn, "Unable to unsubscribe from '#{topic}'")
@@ -93,6 +109,12 @@ defmodule Syncro.Cache do
   @spec listen_sync(atom, atom) :: :ok | {:error, term}
   def listen_sync(name, node) when is_atom(name) and is_atom(node) do
     GenServer.call(__MODULE__, {:subscribe, "sync:#{name}", node})
+  end
+
+  @spec add_notifier((atom, map -> any)) :: :ok | {:error, term}
+
+  def add_notifier(func) when is_function(func, 2) do
+    GenServer.call(__MODULE__, {:add_notifier, func})
   end
 
   @spec get(atom, any()) :: any()

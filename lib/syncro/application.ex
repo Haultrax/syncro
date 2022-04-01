@@ -2,24 +2,24 @@ defmodule Syncro.Application do
   use Application
   require Logger
 
-  alias Syncro.{Nodes, Cache, Provider}
-
   @reconnect_period 10
 
   def start(_type, _args) do
     configure_nodes()
 
-    children = [
+    opts = [strategy: :one_for_one, name: Syncro.Supervisor]
+    ret = Supervisor.start_link(children(), opts)
+
+    ret
+  end
+
+  def children() do
+    [
       {Phoenix.PubSub, name: Syncro.server(), adapter: Phoenix.PubSub.PG2},
       Syncro.Cache,
       Syncro.Provider,
       Syncro.Monitor
     ]
-
-    opts = [strategy: :one_for_one, name: Syncro.Supervisor]
-    ret = Supervisor.start_link(children, opts)
-
-    ret
   end
 
   defp log(level, msg), do: Logger.log(level, "[Syncro] #{msg}")
