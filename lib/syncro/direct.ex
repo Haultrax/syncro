@@ -9,7 +9,6 @@ defmodule Syncro.Direct do
         {:error, :unknown_name}
 
       nodename ->
-        # TODO: update to erpc
         case :rpc.call(nodename, module, func, args) do
           {:badrpc, :nodedown} -> {:error, :nodedown}
           {:badrpc, reason} -> {:error, reason}
