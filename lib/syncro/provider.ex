@@ -78,4 +78,6 @@ defmodule Syncro.Provider do
     data = apply(module, fun, args)
     sync(name, data)
   end
+
+  def is_providing?(), do: length(ETS.list(@registry)) > 0
 end

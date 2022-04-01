@@ -19,14 +19,16 @@ defmodule Syncro.Monitor do
     {:ok, %{}}
   end
 
-  def handle_info({:nodedown, nodename}, state) do
-    log(:info, "Disconnected from '#{nodename}'")
+  def handle_info({:nodedown, _nodename}, state) do
     {:noreply, state}
   end
 
   def handle_info({:nodeup, nodename}, state) do
-    log(:info, "Connected to #{nodename}")
-    Provider.sync_all()
+    if Provider.is_providing?() do
+      log(:info, "Connected to #{nodename}")
+      Provider.sync_all()
+    end
+
     {:noreply, state}
   end
 end

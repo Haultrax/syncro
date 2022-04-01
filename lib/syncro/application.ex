@@ -12,7 +12,8 @@ defmodule Syncro.Application do
     children = [
       {Phoenix.PubSub, name: Syncro.server(), adapter: Phoenix.PubSub.PG2},
       Syncro.Cache,
-      Syncro.Provider
+      Syncro.Provider,
+      Syncro.Monitor
     ]
 
     opts = [strategy: :one_for_one, name: Syncro.Supervisor]
