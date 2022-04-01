@@ -54,6 +54,7 @@ defmodule Syncro.Provider do
       end
 
     ETS.insert(@registry, name, sync_thru)
+    sync(name)
   end
 
   def sync(name) do
