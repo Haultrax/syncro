@@ -1,5 +1,6 @@
 defmodule Syncro.Cache do
   use GenServer
+
   require Logger
   alias Syncro.ETS
 
@@ -53,7 +54,7 @@ defmodule Syncro.Cache do
   end
 
   defp request_sync(reason) do
-    log(:debug, "sending sync request")
+    log(:debug, "sending sync request: #{reason}")
     Phoenix.PubSub.broadcast(Syncro.server(), "request-sync", {"request-sync", node(), reason})
   end
 
@@ -106,15 +107,9 @@ defmodule Syncro.Cache do
 
   def info(), do: GenServer.call(__MODULE__, :info)
 
-  @spec listen_sync(atom, atom) :: :ok | {:error, term}
-  def listen_sync(name, node) when is_atom(name) and is_atom(node) do
+  @spec listen(atom, atom) :: :ok | {:error, term}
+  def listen(name, node) when is_atom(name) and is_atom(node) do
     GenServer.call(__MODULE__, {:subscribe, "sync:#{name}", node})
-  end
-
-  @spec add_notifier((atom, map -> any)) :: :ok | {:error, term}
-
-  def add_notifier(func) when is_function(func, 2) do
-    GenServer.call(__MODULE__, {:add_notifier, func})
   end
 
   @spec get(atom, any()) :: any()
@@ -125,6 +120,11 @@ defmodule Syncro.Cache do
     end
   end
 
-  @spec force_sync() :: :ok | {:error, term}
-  def force_sync(), do: GenServer.call(__MODULE__, :force_sync)
+  # @spec add_notifier((atom, map -> any)) :: :ok | {:error, term}
+  # def add_notifier(func) when is_function(func, 2) do
+  #   GenServer.call(__MODULE__, {:add_notifier, func})
+  # end
+
+  # @spec force_sync() :: :ok | {:error, term}
+  # def force_sync(), do: GenServer.call(__MODULE__, :force_sync)
 end

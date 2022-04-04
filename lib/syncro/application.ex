@@ -7,19 +7,15 @@ defmodule Syncro.Application do
   def start(_type, _args) do
     configure_nodes()
 
-    opts = [strategy: :one_for_one, name: Syncro.Supervisor]
-    ret = Supervisor.start_link(children(), opts)
-
-    ret
-  end
-
-  def children() do
-    [
+    children = [
       {Phoenix.PubSub, name: Syncro.server(), adapter: Phoenix.PubSub.PG2},
       Syncro.Cache,
       Syncro.Provider,
       Syncro.Monitor
     ]
+
+    opts = [strategy: :one_for_one, name: Syncro.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 
   defp log(level, msg), do: Logger.log(level, "[Syncro] #{msg}")
