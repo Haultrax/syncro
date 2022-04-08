@@ -70,7 +70,7 @@ defmodule Syncro.Provider do
   def sync(name, data) do
     topic = "sync:#{name}"
     log(:debug, "Syncing on '#{Syncro.server()}' => '#{topic}'")
-    Phoenix.PubSub.broadcast(Syncro.server(), topic, {name, data})
+    Phoenix.PubSub.broadcast(Syncro.server(), topic, {topic, name, data})
   end
 
   @spec sync_all() :: :ok
