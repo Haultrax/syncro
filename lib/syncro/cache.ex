@@ -21,11 +21,14 @@ defmodule Syncro.Cache do
 
   def handle_info({"sync:" <> _topic, name, data}, state) do
     cache_data(name, data)
-
     {:noreply, state}
   end
 
   def handle_call(:info, _from, state), do: {:reply, state, state}
+
+  def handle_call(:available, _from, topics) do
+    {:reply, Map.keys(topics), topics}
+  end
 
   def handle_call(:force_sync, _from, state) do
     resp = request_sync("forced")
@@ -54,8 +57,7 @@ defmodule Syncro.Cache do
         case Phoenix.PubSub.subscribe(Syncro.server(), topic) do
           :ok ->
             log(:info, "Subscribed to '#{topic}'")
-            topics = Map.put(topics, topic, node)
-            {:ok, Map.put(topics, :topics, topics)}
+            {:ok, Map.put(topics, topic, node)}
 
           error ->
             log(:warn, "Unable to subscribe to '#{topic}'")
@@ -75,8 +77,7 @@ defmodule Syncro.Cache do
         case Phoenix.PubSub.unsubscribe(Syncro.server(), topic) do
           :ok ->
             log(:info, "Unsubscribed from '#{topic}'")
-            topics = Map.drop(topics, [topic])
-            {:ok, Map.put(topics, :topics, topics)}
+            {:ok, Map.drop(topics, [topic])}
 
           error ->
             log(:warn, "Unable to unsubscribe from '#{topic}'")
@@ -103,10 +104,8 @@ defmodule Syncro.Cache do
   end
 
   @spec get(atom, any()) :: any()
-  def get(name, default \\ nil) when is_atom(name) do
-    case :ets.lookup(@tab, name) do
-      [{^name, data}] -> data
-      _ -> default
-    end
-  end
+  def get(name, default \\ nil) when is_atom(name), do: ETS.get(@tab, name, default)
+
+  @spec available() :: list(atom)
+  def available(), do: GenServer.call(__MODULE__, :available)
 end

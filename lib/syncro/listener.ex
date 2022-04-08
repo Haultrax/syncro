@@ -15,7 +15,7 @@ defmodule Syncro.Listener do
       def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
       def init(state) do
-        Enum.each(__topic_set__, fn topic ->
+        Enum.each(topic_set(), fn topic ->
           Logger.debug("#{__MODULE__} | subscribing to '#{topic}'")
           :ok = Phoenix.PubSub.subscribe(Syncro.server(), topic)
         end)
@@ -24,7 +24,7 @@ defmodule Syncro.Listener do
       end
 
       def handle_info({topic, msg}, state) do
-        case MapSet.member?(__topic_set__, topic) do
+        case MapSet.member?(topic_set(), topic) do
           true ->
             handle_in(topic, msg)
 
@@ -36,7 +36,7 @@ defmodule Syncro.Listener do
       end
 
       def handle_info({topic, _name, msg}, state) do
-        case MapSet.member?(__topic_set__, topic) do
+        case MapSet.member?(topic_set(), topic) do
           true ->
             handle_in(topic, msg)
 
@@ -46,6 +46,8 @@ defmodule Syncro.Listener do
 
         {:noreply, state}
       end
+
+      def topic_set(), do: apply(__MODULE__, :__topic_set__, [])
     end
   end
 
