@@ -1,5 +1,6 @@
 defmodule Syncro.Cache do
   use GenServer
+
   require Logger
   alias Syncro.ETS
 
@@ -9,7 +10,7 @@ defmodule Syncro.Cache do
   defp log(level, msg), do: Logger.log(level, "[Syncro|Cache] #{msg}")
 
   def start_link(_opts) do
-    state = %{topics: %{}, notifier: nil}
+    state = %{}
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
 
@@ -18,22 +19,15 @@ defmodule Syncro.Cache do
     {:ok, state}
   end
 
-  def handle_info({name, data}, state) do
-    cache(name, data)
-
-    case state.notifier do
-      nil -> nil
-      fun -> fun.(name, data)
-    end
-
+  def handle_info({"sync:" <> _topic, name, data}, state) do
+    cache_data(name, data)
     {:noreply, state}
   end
 
   def handle_call(:info, _from, state), do: {:reply, state, state}
 
-  def handle_call({:add_notifier, func}, _from, state) do
-    state = Map.put(state, :notifier, func)
-    {:reply, :ok, state}
+  def handle_call(:available, _from, topics) do
+    {:reply, Map.keys(topics), topics}
   end
 
   def handle_call(:force_sync, _from, state) do
@@ -53,78 +47,65 @@ defmodule Syncro.Cache do
   end
 
   defp request_sync(reason) do
-    log(:debug, "sending sync request")
+    log(:debug, "sending sync request: #{reason}")
     Phoenix.PubSub.broadcast(Syncro.server(), "request-sync", {"request-sync", node(), reason})
   end
 
-  defp subscribe(topic, node, state) do
-    case Map.has_key?(state.topics, topic) do
+  defp subscribe(topic, node, topics) do
+    case Map.has_key?(topics, topic) do
       false ->
         case Phoenix.PubSub.subscribe(Syncro.server(), topic) do
           :ok ->
             log(:info, "Subscribed to '#{topic}'")
-            topics = Map.put(state.topics, topic, node)
-            {:ok, Map.put(state, :topics, topics)}
+            {:ok, Map.put(topics, topic, node)}
 
           error ->
             log(:warn, "Unable to subscribe to '#{topic}'")
             log(:error, inspect(error))
             :timer.sleep(@fail_timeout)
-            subscribe(topic, node, state)
+            subscribe(topic, node, topics)
         end
 
       _ ->
-        {:ok, state}
+        {:ok, topics}
     end
   end
 
-  defp unsubscribe(topic, state) do
-    case Map.has_key?(state, topic) do
+  defp unsubscribe(topic, topics) do
+    case Map.has_key?(topics, topic) do
       false ->
         case Phoenix.PubSub.unsubscribe(Syncro.server(), topic) do
           :ok ->
             log(:info, "Unsubscribed from '#{topic}'")
-            topics = Map.drop(state.topics, [topic])
-            {:ok, Map.put(state, :topics, topics)}
+            {:ok, Map.drop(topics, [topic])}
 
           error ->
             log(:warn, "Unable to unsubscribe from '#{topic}'")
             log(:error, inspect(error))
             :timer.sleep(@fail_timeout)
-            unsubscribe(topic, state)
+            unsubscribe(topic, topics)
         end
 
       _ ->
-        {:ok, state}
+        {:ok, topics}
     end
   end
 
-  defp cache(name, data) do
+  defp cache_data(name, data) do
     log(:debug, "Updating '#{name}'")
     ETS.insert(@tab, name, data)
   end
 
   def info(), do: GenServer.call(__MODULE__, :info)
 
-  @spec listen_sync(atom, atom) :: :ok | {:error, term}
-  def listen_sync(name, node) when is_atom(name) and is_atom(node) do
+  @spec listen(atom, atom) :: :ok | {:error, term}
+  def listen(name, node) when is_atom(name) and is_atom(node) do
     GenServer.call(__MODULE__, {:subscribe, "sync:#{name}", node})
   end
 
-  @spec add_notifier((atom, map -> any)) :: :ok | {:error, term}
-
-  def add_notifier(func) when is_function(func, 2) do
-    GenServer.call(__MODULE__, {:add_notifier, func})
-  end
-
   @spec get(atom, any()) :: any()
-  def get(name, default \\ nil) when is_atom(name) do
-    case :ets.lookup(@tab, name) do
-      [{^name, data}] -> data
-      _ -> default
-    end
-  end
+  def get(name, default \\ nil) when is_atom(name), do: ETS.get(@tab, name, default)
 
-  @spec force_sync() :: :ok | {:error, term}
-  def force_sync(), do: GenServer.call(__MODULE__, :force_sync)
+  @spec available() :: list(atom)
+  def available(), do: GenServer.call(__MODULE__, :available)
 end

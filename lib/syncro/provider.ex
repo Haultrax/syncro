@@ -1,5 +1,6 @@
 defmodule Syncro.Provider do
   use GenServer
+
   require Logger
   alias Syncro.ETS
 
@@ -18,7 +19,7 @@ defmodule Syncro.Provider do
 
   def handle_continue(:listen, state) do
     Phoenix.PubSub.subscribe(Syncro.server(), "request-sync")
-    log(:debug, "Listening for requests")
+    log(:debug, "Accepting manual sync requests")
     {:noreply, state}
   end
 
@@ -68,7 +69,8 @@ defmodule Syncro.Provider do
   @spec sync(String.t(), any()) :: :ok | {:error, term}
   def sync(name, data) do
     topic = "sync:#{name}"
-    Phoenix.PubSub.broadcast(Syncro.server(), topic, {name, data})
+    log(:debug, "Syncing on '#{Syncro.server()}' => '#{topic}'")
+    Phoenix.PubSub.broadcast(Syncro.server(), topic, {topic, name, data})
   end
 
   @spec sync_all() :: :ok
